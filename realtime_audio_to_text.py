@@ -66,10 +66,16 @@ def upload_audio():
              sample_width = wav_file.getsampwidth()
              frame_rate = wav_file.getframerate()
 
+             # Read the entire audio content as bytes
+            audio_content = wav_file.readframes(wav_file.getnframes())
+
             print(sample_width)
             print(frame_rate)
+
+            # Convert raw audio content to NumPy array
+            audio_np = np.frombuffer(audio_content, dtype=np.int16).astype(np.float32) / 32768.0
  
-            audio_data = sr.AudioData(audio_wav.read(), sample_width,frame_rate)
+            audio_data = sr.AudioData(audio_wav.read(), sample_width=sample_width, sample_rate=frame_rate // sample_width)
             
             # Convert in-ram buffer to something the model can use directly without needing a temp file.
             # Convert data from 16 bit wide integers to floating point with a width of 32 bits.
