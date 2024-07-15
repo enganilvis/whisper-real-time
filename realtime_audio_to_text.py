@@ -73,14 +73,14 @@ def upload_audio():
             print(frame_rate)
 
             # Convert raw audio content to NumPy array
-            audio_np = np.frombuffer(audio_content, dtype=np.int16).astype(np.float32) / 32768.0
+            audio_np_data = np.frombuffer(audio_content, dtype=np.int16).astype(np.float32) / 32768.0
  
             audio_data = sr.AudioData(audio_wav.read(), sample_width=sample_width, sample_rate=frame_rate // sample_width)
             
             # Convert in-ram buffer to something the model can use directly without needing a temp file.
             # Convert data from 16 bit wide integers to floating point with a width of 32 bits.
             # Clamp the audio stream frequency to a PCM wavelength compatible default of 32768hz max.
-            audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+            audio_np = np.frombuffer(audio_np_data, dtype=np.int16).astype(np.float32) / 32768.0
 
             # Read the transcription.
             result = audio_model.transcribe(audio_np, fp16=torch.cuda.is_available())
