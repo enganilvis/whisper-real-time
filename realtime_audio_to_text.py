@@ -4,12 +4,23 @@ import numpy as np
 import torch
 from pydub import AudioSegment
 import io
+import re
 
 app = Flask(__name__)
 
 # Load the Whisper model (adjust model name as needed)
 model_name = "base.en"  # Default to English model
 audio_model = whisper.load_model(model_name)
+
+# Function to mask mobile numbers
+def mask_mobile_number(text):
+    pattern = re.compile(r'(\b\d{3})\d{4}(\d{3}\b)')
+    return pattern.sub(r'\1****\2', text)
+
+# Function to mask account numbers
+def mask_account_number(text):
+    pattern = re.compile(r'(\b\d{4})\d{4}(\d{4}\b)')
+    return pattern.sub(r'\1****\2', text)
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
@@ -38,7 +49,10 @@ def transcribe():
         result = audio_model.transcribe(audio_np, language=language, fp16=torch.cuda.is_available())
         transcript = result['text'].strip()
 
-        return jsonify({'transcript': transcript})
+        masked_transcript = mask_mobile_number(transcript)
+        masked_transcript = mask_account_number(masked_transcript)
+
+        return jsonify({'transcript': masked_transcript})
 
     except Exception as e:
         print(f"Error: {e}")
