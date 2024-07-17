@@ -6,8 +6,10 @@ from pydub import AudioSegment
 import io
 import re
 from word2number import w2n
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # Load the Whisper model (adjust model name as needed)
 model_name = "base.en"  # Default to English model
@@ -28,21 +30,23 @@ def convert_words_to_numbers_and_mask(text):
     # Regular expression pattern to find mobile numbers (e.g., 123 456 7890)
     mobile_pattern = re.compile(r'(\b\d{3})\s*(\d{3})\s*(\d{4}\b)')
     
+    # Regular expression to find number words
+    number_words_pattern = re.compile(r'\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|'
+                                      r'eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|'
+                                      r'eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|'
+                                      r'eighty|ninety|hundred|thousand|million|billion|trillion|'
+                                      r'and|[-\s])+\b', re.IGNORECASE)
+    
+    def convert_match_to_number(match):
+        try:
+            word_num = match.group(0).replace('-', ' ').replace(' and ', ' ')
+            return str(w2n.word_to_num(word_num))
+        except ValueError:
+            return match.group(0)
+    
     # Convert words to numbers
     try:
-        # Split text into words and attempt to convert each word to a number
-        words = text.split()
-        converted_words = []
-        for word in words:
-            try:
-                converted_word = str(w2n.word_to_num(word))
-            except ValueError:
-                # If word cannot be converted, keep it as is
-                converted_word = word
-            converted_words.append(converted_word)
-        
-        # Join converted words back into text
-        text = ' '.join(converted_words)
+        text = number_words_pattern.sub(convert_match_to_number, text)
     except Exception as e:
         return f"Error converting words to numbers: {str(e)}"
     
@@ -51,6 +55,9 @@ def convert_words_to_numbers_and_mask(text):
     
     # Mask mobile numbers
     text = mobile_pattern.sub(replace_and_mask_mobiles, text)
+    
+    # Remove extra spaces from the text
+    text = re.sub(r'\s+', ' ', text).strip()
     
     return text
 
