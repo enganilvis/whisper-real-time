@@ -5,6 +5,7 @@ import torch
 from pydub import AudioSegment
 import io
 import re
+from word2number import w2n
 
 app = Flask(__name__)
 
@@ -12,15 +13,46 @@ app = Flask(__name__)
 model_name = "base.en"  # Default to English model
 audio_model = whisper.load_model(model_name)
 
-# Function to mask mobile numbers
-def mask_mobile_number(text):
-    pattern = re.compile(r'(\b\d{3})\d{4}(\d{3}\b)')
-    return pattern.sub(r'\1****\2', text)
-
-# Function to mask account numbers
-def mask_account_number(text):
-    pattern = re.compile(r'(\b\d{4})\d{4}(\d{4}\b)')
-    return pattern.sub(r'\1****\2', text)
+def convert_words_to_numbers_and_mask(text):
+    # Define a function to replace and mask account numbers
+    def replace_and_mask_accounts(match):
+        return f"{match.group(1)}****{match.group(2)}"
+    
+    # Define a function to replace and mask mobile numbers
+    def replace_and_mask_mobiles(match):
+        return f"{match.group(1)}****{match.group(2)}"
+    
+    # Regular expression pattern to find account numbers (e.g., 1234 5678 9012)
+    account_pattern = re.compile(r'(\b\d{4})\s*(\d{4})\s*(\d{4}\b)')
+    
+    # Regular expression pattern to find mobile numbers (e.g., 123 456 7890)
+    mobile_pattern = re.compile(r'(\b\d{3})\s*(\d{3})\s*(\d{4}\b)')
+    
+    # Convert words to numbers
+    try:
+        # Split text into words and attempt to convert each word to a number
+        words = text.split()
+        converted_words = []
+        for word in words:
+            try:
+                converted_word = str(w2n.word_to_num(word))
+            except ValueError:
+                # If word cannot be converted, keep it as is
+                converted_word = word
+            converted_words.append(converted_word)
+        
+        # Join converted words back into text
+        text = ' '.join(converted_words)
+    except Exception as e:
+        return f"Error converting words to numbers: {str(e)}"
+    
+    # Mask account numbers
+    text = account_pattern.sub(replace_and_mask_accounts, text)
+    
+    # Mask mobile numbers
+    text = mobile_pattern.sub(replace_and_mask_mobiles, text)
+    
+    return text
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
@@ -49,8 +81,9 @@ def transcribe():
         result = audio_model.transcribe(audio_np, language=language, fp16=torch.cuda.is_available())
         transcript = result['text'].strip()
 
-        masked_transcript = mask_mobile_number(transcript)
-        masked_transcript = mask_account_number(masked_transcript)
+        masked_transcript = convert_words_to_numbers_and_mask(transcript)
+
+        print(masked_transcript)
 
         return jsonify({'transcript': masked_transcript})
 
